@@ -6,6 +6,7 @@ import { userModel,contentModel } from "./db"
 import  {Middleware}  from "./middleware"
 import {z} from "zod"
 import mongoose from "mongoose"
+import bcrypt from "bcrypt"
 app.use(express.json())
 
 async function Main(){
@@ -28,10 +29,12 @@ app.post("/api/v1/signup",async(req,res)=>{
             message:parsedData.error.message
         })
     }
-    const{username,password}=req.body
+    
+    const{username,password}=req.body;
+    const hashedPassword=await bcrypt.hash(password,6)
     await userModel.create({
         username:username,
-        password:password
+        password:hashedPassword
     })
     res.json({
         message:"you have been signed up successfully"
@@ -45,21 +48,31 @@ app.post("/api/v1/login",async(req,res)=>{
         username:username,
         password:password
     })
-    if(user){
-        const token=jwt.sign({
-            id:user._id
-
-        },JWT_SECRET)
+    if(!user){
         res.json({
-            token:token
+            message:"the user does not exist"
         })
     }
     else{
-        res.json({
-            message:"invalid credentials bro"
-        })
+        const passwordMatch=await bcrypt.compare(password,user.password)
+        if(user&&passwordMatch){
+            const token=jwt.sign({
+                id:user._id
+    
+            },JWT_SECRET)
+            res.json({
+                token:token
+            })
+        }
+        else{
+            res.json({
+                message:"invalid credentials bro"
+            })
+        }
+    
     }
-
+    
+    
 
 })
 
@@ -78,10 +91,16 @@ app.post("/api/v1/content",Middleware,async(req,res)=>{
     
 
 })
-app.put("/api/v1/content/:id",Middleware,(req,res)=>{
 
-})
-app.get("/api/v1/content",(req,res)=>{
+app.get("/api/v1/content",async(req,res)=>{
+    //@ts-ignore
+    const userId=req.userId
+    const content=await contentModel.find({
+        userId:userId
+    })
+    res.json({
+        content
+    })
 
 })
 app.post("/api/v1/brain/share",(req,res)=>{
